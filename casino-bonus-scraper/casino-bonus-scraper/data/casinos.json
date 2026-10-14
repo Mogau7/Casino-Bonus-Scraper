@@ -1,5 +1,20 @@
-{
-  "generated_at": null,
-  "source": null,
-  "casinos": []
-}
+[
+    {
+        "Welcome bonus": "100% up to 500 EUR",
+        "Wagering requirement (multiplier)": 35,
+        "Minimum deposit": "20 EUR",
+        "Source URL": "https://casinoratings.io"
+    },
+    {
+        "Welcome bonus": "200% up to 300 EUR",
+        "Wagering requirement (multiplier)": 40,
+        "Minimum deposit": "10 EUR",
+        "Source URL": "https://casinoratings.io"
+    },
+    {
+        "Welcome bonus": "50% up to 1000 EUR",
+        "Wagering requirement (multiplier)": 25,
+        "Minimum deposit": "50 EUR",
+        "Source URL": "https://casinoratings.io"
+    }
+]

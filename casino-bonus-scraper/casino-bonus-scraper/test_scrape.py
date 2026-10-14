@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import urllib.request
 import tempfile
 import threading
 import unittest
@@ -100,10 +102,12 @@ class ScraperTests(unittest.TestCase):
     def setUp(self):
         Site.robots, Site.robots_status, Site.page, Site.page_status = "User-agent: *\nAllow: /\n", 200, PAGE, 200
         FakeModelApi.calls, FakeModelApi.fail_first, FakeModelApi.status = [], 0, 200
+        self.saved = (scrape.SOURCE_URL, scrape.OUTPUT, scrape.API_URL, scrape.run)
         self.tmp = tempfile.TemporaryDirectory()
         self.out = os.path.join(self.tmp.name, "data", "casinos.json")
 
     def tearDown(self):
+        scrape.SOURCE_URL, scrape.OUTPUT, scrape.API_URL, scrape.run = self.saved
         self.tmp.cleanup()
 
     def test_table_picks_the_casino_table_and_first_rows(self):
@@ -207,6 +211,40 @@ class ScraperTests(unittest.TestCase):
         os.environ["ANTHROPIC_API_KEY"] = "test-key"
         result = scrape.run(self.base + "/page", 3, output=self.out)
         self.assertEqual(len(result["casinos"]), 3)
+
+    def test_scraper_output_matches_what_the_page_reads(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "index.html"), encoding="utf-8") as handle:
+            page = handle.read()
+        result = scrape.run(self.base + "/page", 3, ask=fake_extract, output=self.out)
+        for key in result["casinos"][0]:
+            self.assertRegex(page, r"c\." + key + r"\b", f"the page never reads {key}")
+        for key in ("generated_at", "source", "casinos"):
+            self.assertRegex(page, r"data\." + key + r"\b")
+        self.assertIn("fetch('" + os.path.relpath(scrape.OUTPUT, here).replace(os.sep, "/") + "'", page)
+
+    def test_committed_json_is_valid_and_has_the_right_shape(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "data", "casinos.json"), encoding="utf-8") as handle:
+            data = json.load(handle)
+        self.assertEqual(set(data), {"generated_at", "source", "casinos"})
+        self.assertIsInstance(data["casinos"], list)
+        for item in data["casinos"]:
+            self.assertEqual(set(item), {"name", "welcome_bonus", "wagering_multiplier", "min_deposit", "source_url"})
+
+    def test_serve_option_serves_page_and_json(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        server = scrape.make_server(0)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            base = f"http://127.0.0.1:{server.server_port}"
+            with urllib.request.urlopen(base + "/") as r:
+                self.assertIn(b"the house never shows its hand", r.read())
+            with urllib.request.urlopen(base + "/data/casinos.json") as r:
+                self.assertIn("casinos", json.load(r))
+        finally:
+            server.shutdown()
+            server.server_close()
 
     def test_main_exit_codes(self):
         scrape.SOURCE_URL = self.base + "/page"

@@ -1,3 +1,5 @@
+import functools
+import http.server
 import json
 import os
 import re
@@ -235,7 +237,26 @@ def run(url=SOURCE_URL, count=HOW_MANY, ask=None, output=OUTPUT):
     return result
 
 
-def main():
+def make_server(port=8000):
+    root = os.path.dirname(os.path.abspath(__file__))
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=root)
+    http.server.ThreadingHTTPServer.allow_reuse_address = True
+    return http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+
+
+def serve(port=8000):
+    server = make_server(port)
+    print(f"Open http://localhost:{server.server_port} (Ctrl+C to stop)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
     try:
         result = run()
     except Blocked as error:
@@ -247,6 +268,8 @@ def main():
     print(f"Wrote {len(result['casinos'])} casinos to {OUTPUT}")
     for item in result["casinos"]:
         print(f"  {item['name']}: {item['welcome_bonus']} | {item['wagering_multiplier']}x | min {item['min_deposit']}")
+    if "--serve" in argv:
+        serve()
     return 0
 
 
